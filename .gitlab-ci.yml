@@ -1,0 +1,62 @@
+# GitLab CI 配置文件
+# 用于自动运行测试
+
+stages:
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHON_VERSION: "3.11"
+  # 设置 pygame 在无头模式下运行（CI 环境没有显示器）
+  SDL_VIDEODRIVER: "dummy"
+  DISPLAY: ":99"
+
+# 缓存 pip 依赖，加速后续构建
+cache:
+  paths:
+    - .cache/pip
+
+# 测试阶段
+test:
+  stage: test
+  image: python:3.11
+  before_script:
+    # 安装系统依赖（pygame 可能需要）
+    - apt-get update -qq
+    - apt-get install -y -qq 
+      python3-dev 
+      libsdl2-dev 
+      libsdl2-image-dev 
+      libsdl2-mixer-dev 
+      libsdl2-ttf-dev 
+      libportmidi-dev 
+      libswscale-dev 
+      libavformat-dev 
+      libavcodec-dev 
+      libfreetype6-dev 
+      build-essential 
+      xvfb
+    # 升级 pip
+    - python -m pip install --upgrade pip setuptools wheel
+    # 安装项目依赖
+    - pip install -r requirements.txt
+    # 安装 pytest 和测试工具
+    - pip install pytest pytest-cov pytest-html
+    # 设置虚拟显示（用于 pygame）
+    - Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+  script:
+    # 运行所有测试
+    - pytest tests/ -v --tb=short --html=pytest-report.html --self-contained-html
+    
+  artifacts:
+    when: always
+    paths:
+      - logs/
+      - pytest-report.html
+    expire_in: 1 week
+  allow_failure: false
+  only:
+    - branches
+    - merge_requests
+    - tags
+
