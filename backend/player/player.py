@@ -751,7 +751,59 @@ class ZhuguoShaPlayer(Player):
 class LingcaoPlayer(Player):
     """凌操武将：摸牌阶段摸牌数量 = 3 + 装备牌数量/2下取整"""
     
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
+    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, 
+                 identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
         super().__init__(player_id, name, control_type, deck, identity, character_name, player_controller)
+        # 设置摸牌阶段技能名
+        self.skill_activate_time_with_skill[GameEvent.DRAW_CARD] = "劫营"
+
+    def draw_card_with_skill(self, count: int = 2) -> List[Card]:
+        """发动劫营技能后的摸牌阶段：摸牌数量 = 3 + 装备牌数量/2下取整"""
+        # 计算装备牌数量（装备区的牌数量）
+        equipment_count = self.get_equipment_count()
+        
+        # 计算额外摸牌数量：装备数量/2向下取整
+        extra_draw = equipment_count // 2
+        
+        # 总摸牌数量 = 3 + 额外摸牌
+        total_draw = 3 + extra_draw
+        
+        # 记录日志
+        game_logger.log_info(f"{self.name} 发动技能[劫营]：装备牌数量={equipment_count}，额外摸牌={extra_draw}，总摸牌数量={total_draw}")
+        
+        # 从牌堆摸牌
+        drawn_cards = []
+        for _ in range(total_draw):
+            card = self.deck.draw_card()
+            if card:
+                drawn_cards.append(card)
+                self.hand_cards.append(card)
+            else:
+                # 牌堆没牌时可能触发其他逻辑，这里简单处理
+                break
+        
+        game_logger.log_info(f"{self.name} 摸牌：{drawn_cards}")
+        return drawn_cards
+    
+    def get_equipment_count(self) -> int:
+        """获取装备牌数量"""
+        # 根据实际游戏结构获取装备数量，这里假设有一个equipment_zone属性
+        # 如果实际游戏结构不同，需要调整此方法
+        if hasattr(self, 'equipment_zone'):
+            # 计算所有装备槽位中的牌数量
+            equipment_count = 0
+            for slot in ['weapon', 'armor', 'defense_horse', 'offense_horse']:
+                if hasattr(self.equipment_zone, slot) and getattr(self.equipment_zone, slot):
+                    equipment_count += 1
+            return equipment_count
+        else:
+            # 备用方案：如果equipment_zone不存在，从手牌和装备区统计装备牌
+            equipment_count = 0
+            # 这里需要根据实际卡牌类型判断是否为装备牌
+            # 假设CardType中有EQUIPMENT类型
+            for card in self.hand_cards + getattr(self, 'equipment_cards', []):
+                if card.card_type == CardType.EQUIPMENT:
+                    equipment_count += 1
+            return equipment_count
         
 
