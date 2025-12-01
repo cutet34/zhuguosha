@@ -749,64 +749,22 @@ class ZhuguoShaPlayer(Player):
 
 
 class LingcaoPlayer(Player):
-    """凌操武将：摸牌阶段摸牌数量 = 3 + 装备牌数量/2下取整"""
+    """凌操武将"""
     
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, 
-                 identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
-        super().__init__(player_id, name, control_type, deck, identity, character_name, player_controller)
-        # 设置摸牌阶段技能名
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.skill_activate_time_with_skill[GameEvent.DRAW_CARD] = "劫营"
-        # 凌操的基础血量上限为4
-        self._base_max_hp = 4
-
-    def get_base_max_hp(self) -> int:
-        """获取凌操的基础血量上限"""
-        return self._base_max_hp
 
     def draw_card_phase_with_skill(self) -> List[Card]:
-        """发动劫营技能后的摸牌阶段：摸牌数量 = 3 + 装备牌数量/2下取整"""
-        # 计算装备牌数量
-        equipment_count = self._get_equipment_count()
-        
-        # 计算额外摸牌数量：装备数量/2向下取整
-        extra_draw = equipment_count // 2
-        
-        # 总摸牌数量 = 3 + 额外摸牌
-        total_draw = 3 + extra_draw
-        
-        # 记录日志
-        game_logger.log_info(f"{self.name} 发动技能[劫营]：装备牌数量={equipment_count}，额外摸牌={extra_draw}，总摸牌数量={total_draw}")
-        
-        # 调用基类的draw_card方法摸牌（直接摸total_draw张）
-        drawn_cards = self.draw_card(total_draw)
-        
-        return drawn_cards
-    
-    def _get_equipment_count(self) -> int:
-        """获取装备牌数量（从装备管理器获取）"""
+        """劫营技能：摸3+装备数/2张牌"""
         equipment_count = 0
+        # 简化装备计数
+        if self.weapon: equipment_count += 1
+        if self.armor: equipment_count += 1
+        if self.horse_plus: equipment_count += 1
+        if self.horse_minus: equipment_count += 1
         
-        # 检查武器槽
-        if self.equipment_manager.weapon:
-            equipment_count += 1
+        total_draw = 3 + (equipment_count // 2)
+        game_logger.log_info(f"{self.name} 发动[劫营]，装备{equipment_count}件，摸{total_draw}张")
         
-        # 检查防具槽
-        if self.equipment_manager.armor:
-            equipment_count += 1
-        
-        # 检查+1马槽
-        if self.equipment_manager.horse_plus:
-            equipment_count += 1
-        
-        # 检查-1马槽
-        if self.equipment_manager.horse_minus:
-            equipment_count += 1
-        
-        return equipment_count
-
-    # 如果需要处理其他技能，可以添加相应的方法
-    # 例如：def play_card_with_skill(self, available_targets: Dict[str, List[int]] = None) -> Tuple[Optional[Card], List[int]]:
-    #         return self.play_card_default(available_targets)
-    
-    # 例如：def discard_card_with_skill(self) -> List[Card]:
-    #         return self.discard_card_default()
+        return self.draw_card(total_draw)
