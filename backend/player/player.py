@@ -691,8 +691,8 @@ class Player:
 
 class ZhangFeiPlayer(Player):
     """张飞武将：出的杀不限次数，技能咆哮"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 设置阵营势力
         self.faction=Faction.SHU
         # 设置出牌阶段技能名
@@ -716,8 +716,8 @@ class ZhangFeiPlayer(Player):
 
 class LvmengPlayer(Player):
     """吕蒙武将：弃牌阶段可选择发动技能"克己"，只有在本回合没有使用过杀的时候才可以不用弃牌"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         #设置阵营势力
         self.faction = Faction.WU
         # 设置弃牌阶段技能名
@@ -741,8 +741,8 @@ class LvmengPlayer(Player):
 
 class ZhuguoShaPlayer(Player):
     """猪国杀武将：专供猪国杀规则使用，没有弃牌阶段"""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 设置阵营势力
         self.faction=None
         # 设置弃牌阶段技能名（虽然不会执行弃牌，但设置技能名以便识别）
@@ -757,8 +757,8 @@ class LingcaoPlayer(Player):
     """凌操 —— 技能：独进
     摸牌阶段，你可以多摸 X+1 张牌（X 为你装备区的牌数 // 2）
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 设置阵营势力
         self.faction=Faction.WU
         # 注册技能：在摸牌阶段生效
@@ -777,14 +777,17 @@ class LingcaoPlayer(Player):
         # X = 装备数 // 2
         extra = (equipment_count // 2) + 1  # X + 1
         total_draw = 2 + extra  # 默认摸 2，再加技能
+        drawn = self.deck.draw_cards(total_draw)
+        self.hand_cards.extend(drawn)
+        return drawn
 
         game_logger.log_info(f"{self.name} 发动【独进】，装备 {equipment_count} 件，额外摸 {extra} 张，共摸 {total_draw} 张")
 
 class CaoCaoPlayer(Player):
     """曹操 —— 技能：奸雄、护驾（主公技）"""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 设置阵营势力
         self.faction=Faction.WEI
 
