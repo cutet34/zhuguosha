@@ -12,7 +12,8 @@ from backend.player.equipment_manager import EquipmentManager
 from backend.player.phase_skill_handler import PhaseSkillManager
 from backend.utils.logger import game_logger
 from backend.utils.event_sender import send_draw_card_event, send_play_card_event, send_hp_change_event, send_discard_card_event, send_equip_change_event, send_death_event
-from config.enums import CardName, CardType, ControlType, PlayerStatus, PlayerIdentity, CharacterName, TargetType, GameEvent, EquipmentType
+from config.enums import CardName, CardType, ControlType, PlayerStatus, PlayerIdentity, CharacterName, TargetType, \
+    GameEvent, EquipmentType, Faction, Gender
 
 
 class Player:
@@ -32,7 +33,7 @@ class Player:
         """
         return 4
     
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
+    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None,faction: Faction = None,gender:Gender = None) :
         """初始化函数
         
         Args:
@@ -43,12 +44,15 @@ class Player:
             identity: 玩家身份
             character_name: 武将名
             player_controller: 玩家控制器引用
+            faction:武将阵营
         """
         self.player_id = player_id
         self.name = name
         self.character_name = character_name or CharacterName.BAI_BAN_WU_JIANG  # 武将名，默认为白板武将
         self.identity = identity or PlayerIdentity.REBEL  # 玩家身份，默认为反贼
         self.status = PlayerStatus.ALIVE  # 存活状态
+        self.faction=faction
+        self.gender=gender or Gender.MALE
         
         # 计算血量上限：基础血量上限 + 主公加成（+1）
         base_max_hp = self.get_base_max_hp()
@@ -81,7 +85,7 @@ class Player:
         # 伤害来源追踪
         self.last_damage_source: Optional[int] = None  # 最后一次伤害的来源玩家ID
         
-        self.skill_activate_time_with_skill = { # 技能发动时间
+        self.skill_activate_time_with_skill:Dict[GameEvent, Optional[str]] = { # 技能发动时间
             GameEvent.DRAW_CARD: None,
             GameEvent.PLAY_CARD: None,
             GameEvent.DISCARD_CARD: None,
@@ -570,7 +574,6 @@ class Player:
                 return len(targets) > 0
         
         return True
-    
     def _get_targets_for_card(self, card: Card, available_targets: Dict[str, List[int]] = None) -> List[int]:
         """获取牌的目标列表
         
@@ -688,9 +691,10 @@ class Player:
 
 class ZhangFeiPlayer(Player):
     """张飞武将：出的杀不限次数，技能咆哮"""
-    
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
-        super().__init__(player_id, name, control_type, deck, identity, character_name, player_controller)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 设置阵营势力
+        self.faction=Faction.SHU
         # 设置出牌阶段技能名
         self.skill_activate_time_with_skill[GameEvent.PLAY_CARD] = "咆哮"
 
@@ -712,9 +716,10 @@ class ZhangFeiPlayer(Player):
 
 class LvmengPlayer(Player):
     """吕蒙武将：弃牌阶段可选择发动技能"克己"，只有在本回合没有使用过杀的时候才可以不用弃牌"""
-    
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
-        super().__init__(player_id, name, control_type, deck, identity, character_name, player_controller)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        #设置阵营势力
+        self.faction = Faction.WU
         # 设置弃牌阶段技能名
         self.skill_activate_time_with_skill[GameEvent.DISCARD_CARD] = "克己"
 
@@ -736,9 +741,10 @@ class LvmengPlayer(Player):
 
 class ZhuguoShaPlayer(Player):
     """猪国杀武将：专供猪国杀规则使用，没有弃牌阶段"""
-    
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None):
-        super().__init__(player_id, name, control_type, deck, identity, character_name, player_controller)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 设置阵营势力
+        self.faction=None
         # 设置弃牌阶段技能名（虽然不会执行弃牌，但设置技能名以便识别）
         self.skill_activate_time_with_skill[GameEvent.DISCARD_CARD] = "无弃牌阶段"
     
@@ -747,24 +753,133 @@ class ZhuguoShaPlayer(Player):
         game_logger.log_info(f"{self.name} 猪国杀规则：跳过弃牌阶段")
         return []
 
-
 class LingcaoPlayer(Player):
-    """凌操武将"""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.skill_activate_time_with_skill[GameEvent.DRAW_CARD] = "劫营"
-
+    """凌操 —— 技能：独进
+    摸牌阶段，你可以多摸 X+1 张牌（X 为你装备区的牌数 // 2）
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 设置阵营势力
+        self.faction=Faction.WU
+        # 注册技能：在摸牌阶段生效
+        self.skill_activate_time_with_skill[GameEvent.DRAW_CARD] = "独进"
+    # -------------------------------------------------
+    # 【独进】摸牌阶段技能
+    # -------------------------------------------------
     def draw_card_phase_with_skill(self) -> List[Card]:
-        """劫营技能：摸3+装备数/2张牌"""
+        """发动【独进】后的摸牌量计算"""
+
         equipment_count = 0
-        # 简化装备计数
         if self.weapon: equipment_count += 1
         if self.armor: equipment_count += 1
         if self.horse_plus: equipment_count += 1
         if self.horse_minus: equipment_count += 1
-        
-        total_draw = 3 + (equipment_count // 2)
-        game_logger.log_info(f"{self.name} 发动[劫营]，装备{equipment_count}件，摸{total_draw}张")
-        
-        return self.draw_card(total_draw)
+        # X = 装备数 // 2
+        extra = (equipment_count // 2) + 1  # X + 1
+        total_draw = 2 + extra  # 默认摸 2，再加技能
+
+        game_logger.log_info(f"{self.name} 发动【独进】，装备 {equipment_count} 件，额外摸 {extra} 张，共摸 {total_draw} 张")
+
+class CaoCaoPlayer(Player):
+    """曹操 —— 技能：奸雄、护驾（主公技）"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 设置阵营势力
+        self.faction=Faction.WEI
+
+        # 注册阶段技能：受到伤害时触发“奸雄”
+        self.skill_activate_time_with_skill[GameEvent.DAMAGE] = "奸雄"
+
+    # ======================【奸雄】=======================
+    def take_damage_with_skill(self, damage, source_player_id=None,
+                               damage_type=None, original_card_name=None):
+        """
+        曹操【奸雄】：
+        当你受到伤害后，你可以获得对你造成伤害的牌。
+        """
+
+        # 先执行默认掉血
+        self.take_damage_default(damage, source_player_id,
+                                 damage_type, original_card_name)
+
+        # original_card_name 代表造成伤害的牌名
+        if original_card_name is None:
+            return
+
+        # 询问曹操要不要发动奸雄
+        context = {
+            "damage": damage,
+            "source_player": source_player_id,
+            "card_name": original_card_name
+        }
+        activate = self.ask_activate_skill("奸雄", context)
+
+        if activate:
+            # 让造成伤害的那张卡进入曹操手牌
+            game_logger.log_info(f"{self.name} 发动【奸雄】，获得造成伤害的牌：{original_card_name}")
+            # 给曹操添加一张该牌名的手牌（模拟进入手牌）
+            self.hand_cards.append(Card(original_card_name))
+
+    # ======================【护驾】（响应技能）=======================
+
+    def ask_use_shan(self, context: str = "") -> Optional[Card]:
+        """
+        曹操【护驾】完整逻辑：
+            1. 曹操需要闪时，先询问是否发动护驾
+            2. 曹操选择发动后：
+                - 按顺序询问每个魏势力友方是否愿意提供闪
+                - 若有队友提供闪 → 曹操视为使用闪（队友失去闪）
+            3. 若没人帮忙 → 曹操自己问自己有没有闪（父类 ask_use_shan）
+
+        Args:
+            context: 使用闪的场景，如"受到杀的攻击"
+
+        Returns:
+            Optional[Card]: 曹操最终打出的闪（含队友代打），或 None（没有闪）
+        """
+
+        # ---------- 1. 曹操决定是否发动护驾 ----------
+        activate = self.ask_activate_skill("护驾", {"context": context})
+
+        if not activate:
+            # 不发动技能 → 走父类正常 ask_use_shan()
+            return super().ask_use_shan(context)
+
+        game_logger.log_info(f"{self.name} 发动【护驾】！")
+
+        # ---------- 2. 曹操发动护驾 → 寻找魏势力队友 ----------
+        if self.player_controller:
+            for p in self.player_controller.players:
+
+                # 跳过自己
+                if p.player_id == self.player_id:
+                    continue
+
+                # 只询问魏势力
+                if p.identity != Faction.WEI:
+                    continue
+
+                # 找出该玩家所有闪
+                shan_cards = [c for c in p.hand_cards if c.name_enum == CardName.SHAN]
+
+                if not shan_cards:
+                    continue
+
+                # 询问队友是否愿意替曹操打闪
+                provided = p.ask_use_card_response(
+                    CardName.SHAN,
+                    shan_cards,
+                    f"替 {self.name} 发动【护驾】（{context}）"
+                )
+
+                if provided:
+                    # 队友提供闪
+                    p.hand_cards.remove(provided)
+                    game_logger.log_info(
+                        f"【护驾】成功：{p.name} 替 {self.name} 打出了【闪】"
+                    )
+                    return provided
+
+        # ---------- 3. 魏势力无人帮忙 → 曹操自己打闪 ----------
+        return super().ask_use_shan(context)
