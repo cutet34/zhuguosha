@@ -2,6 +2,8 @@
 from typing import List, Optional, Tuple, Dict, Any
 import sys
 import os
+
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.card.card import Card
@@ -51,9 +53,11 @@ class Player:
         self.character_name = character_name or CharacterName.BAI_BAN_WU_JIANG  # 武将名，默认为白板武将
         self.identity = identity or PlayerIdentity.REBEL  # 玩家身份，默认为反贼
         self.status = PlayerStatus.ALIVE  # 存活状态
-        self.faction=faction
-        self.gender=gender or Gender.MALE
-        
+        self.faction=faction or Faction.WEI   #阵营,默认为魏
+        self.gender=gender or Gender.MALE #性别，默认为男
+        self.skills = []  # 玩家技能列表（Skill 实例）
+        self.runtime_state = {}  # 通用状态标记，技能可写入，规则点读取，记录技能产生的临时状态/次数/开关
+
         # 计算血量上限：基础血量上限 + 主公加成（+1）
         base_max_hp = self.get_base_max_hp()
         if self.identity == PlayerIdentity.LORD:
@@ -222,7 +226,9 @@ class Player:
             # 对于杀，让Control重新过滤攻击范围内的目标
             if hasattr(self.control, 'filter_attackable_targets'):
                 targets = self.control.filter_attackable_targets(targets, available_targets)
-        
+        if selected_card is not None and selected_card.name_enum == CardName.SHA:
+            self.runtime_state["sha_used_or_played_in_play_phase"] = True
+
         # 如果是自己类型的牌，直接使用自己
         if selected_card.target_type == TargetType.SELF:
             selected_targets = [self.player_id]
@@ -281,12 +287,7 @@ class Player:
         else:
             # 单目标牌正常发送
             send_play_card_event(selected_card, self.player_id, selected_targets)
-        
-        # 如果出的是杀牌，标记当前回合已使用杀（除非装备了诸葛连弩）
-        if selected_card.name_enum == CardName.SHA:
-            # 如果装备了诸葛连弩，出杀次数不受限制
-            if not (self.weapon and self.weapon.name_enum == CardName.ZHU_GE_LIAN_NU):
-                self.sha_used_this_turn = True
+
         
         return selected_card, selected_targets
     
@@ -329,8 +330,16 @@ class Player:
             game_logger.log_info(f"{self.name} 弃牌: {', '.join(card_names)}")
         
         return discarded_cards
-    
-    def take_damage(self, damage: int, source_player_id: Optional[int] = None, 
+
+    def should_skip_phase(self, event_type: "GameEvent", context: Dict[str, Any]) -> bool:
+        """判断是否跳过某个阶段（通用钩子）。"""
+        for skill in getattr(self, "skills", []):
+            fn = getattr(skill, "should_skip_phase", None)
+            if callable(fn) and fn(self, event_type, context):
+                return True
+        return False
+
+    def take_damage(self, damage: int, source_player_id: Optional[int] = None,
                     damage_type: str = None, original_card_name: str = None) -> None:
         """受伤（使用阶段技能管理器）"""
         self.phase_skill_manager.execute_phase(
@@ -520,19 +529,12 @@ class Player:
             是否可以出牌
         """
         # 杀牌判断
-        if card.name_enum == CardName.SHA:
-            # 如果装备了诸葛连弩，出杀次数不受限制
-            if self.weapon and self.weapon.name_enum == CardName.ZHU_GE_LIAN_NU:
-                # 仍需检查是否有合法目标
-                targets = self._get_targets_for_card(card, available_targets)
-                return len(targets) > 0
-            # 否则杀必须当前回合没有出过且攻击范围内有人才能使用
-            if self.sha_used_this_turn:
-                return False
-            # 检查是否有合法目标
-            targets = self._get_targets_for_card(card, available_targets)
-            return len(targets) > 0
-        
+        # 中文注释：若已使用过杀，则只有在上限 > 1（或无限）时仍允许继续出杀
+        limit = self.get_sha_limit({"available_targets": available_targets})
+        if self.sha_used_this_turn and limit <= 1:
+            return False
+
+
         # 闪牌判断
         elif card.name_enum == CardName.SHAN:
             # 闪无论如何不能使用
@@ -604,7 +606,36 @@ class Player:
         if card.target_type != TargetType.ALL:
             targets = [t for t in targets if t != self.player_id]
         return targets
-    
+
+    def get_sha_limit(self, context: Dict[str, Any]) -> int:
+        """计算本回合【杀】的使用次数上限（通用钩子）。
+
+        约定：
+        - 默认上限为 1。
+        - 诸葛连弩：视为无限（用一个极大值表示）。
+        - 技能可通过实现 skill.modify_sha_limit(...) 修改上限。
+
+        Args:
+            context: 上下文字典，可包含 available_targets、event_type 等信息。
+
+        Returns:
+            int: 本回合【杀】次数上限。
+        """
+        # 中文注释：基础上限
+        base_limit = 1
+
+        # 中文注释：诸葛连弩 => 无限
+        if self.weapon is not None and self.weapon.name_enum == CardName.ZHU_GE_LIAN_NU:
+            base_limit = 10 ** 9
+
+        # 中文注释：技能可修改上限（不依赖任何 runtime_state 的特定 key）
+        for skill in getattr(self, "skills", []):
+            fn = getattr(skill, "modify_sha_limit", None)
+            if callable(fn):
+                base_limit = fn(self, base_limit, context)
+
+        return base_limit
+
     def ask_use_card(self, card_name: CardName, context: str = "") -> Optional[Card]:
         """询问玩家是否使用指定牌（响应类查询，与正常出牌分开）
         
@@ -677,7 +708,33 @@ class Player:
     
     def reset_turn_state(self) -> None:
         """重置回合状态"""
-        self.sha_used_this_turn = False
+        self.runtime_state["play_phase_executed"] = False
+        self.runtime_state["sha_used_or_played_in_play_phase"] = False
+
+    def get_draw_num(self, base_num: int, context: Dict[str, Any]) -> int:
+        """计算摸牌阶段应摸的牌数（通用钩子）。
+
+        说明：
+        - 默认摸牌数为 base_num（通常是 2）。
+        - 装备、技能等可以通过实现 modify_draw_num(player, current_num, context)
+          来修改最终的摸牌数量。
+        - 本方法只负责组合这些修改，不关心具体武将或技能名。
+
+        Args:
+            base_num: 基础摸牌数（如 2）。
+            context: 摸牌阶段上下文信息。
+
+        Returns:
+            int: 最终应摸的牌数。
+        """
+        draw_num = base_num
+
+        for sk in getattr(self, "skills", []):
+            modify_fn = getattr(sk, "modify_draw_num", None)
+            if callable(modify_fn):
+                draw_num = modify_fn(self, draw_num, context)
+
+        return draw_num
 
     def ask_activate_skill(self, skill_name: str, context: dict) -> bool:
         """统一武将技能发动询问，直接委托Control，true为发动。"""
@@ -688,55 +745,105 @@ class Player:
                 return False
         return False
 
+    def trigger_skills(self, context: Dict[str, Any]) -> None:
+        """触发玩家身上的技能（广播式触发：同一阶段/事件可触发多个技能）。
+
+        规则：
+        - 先调用 skill.can_activate(self, context) 判断是否满足触发条件。
+        - 锁定技（skill.is_locked == True）直接生效，不询问。
+        - 非锁定技默认会询问 control：player.ask_activate_skill(skill_name, context)。
+        - 技能可以自定义：
+          - skill.name：技能名（用于询问与日志）
+          - skill.need_ask：是否需要询问（默认 True；锁定技一般不需要）
+
+        Args:
+            context: 技能触发上下文，建议至少包含 phase/event_type 等信息。
+                     例如：{"phase": GamePhase.PLAY_CARD, "event_type": GameEvent.PLAY_CARD, ...}
+
+        Returns:
+            None
+        """
+        # 没有技能列表则直接返回（兼容旧实现）
+        skills = getattr(self, "skills", None)
+        if not skills:
+            return
+
+        # 遍历副本，避免技能在触发中增删列表导致迭代异常
+        for skill in list(skills):
+            try:
+                # 先判断是否满足触发条件
+                if not skill.can_activate(self, context):
+                    continue
+
+                # 锁定技不询问，直接生效
+                is_locked = bool(getattr(skill, "is_locked", False))
+                if is_locked:
+                    skill.activate(self, context)
+                    continue
+
+                # 非锁定技默认需要询问是否发动
+                skill_name = getattr(skill, "name", skill.__class__.__name__)
+                need_ask = bool(getattr(skill, "need_ask", True))
+                if need_ask:
+                    if not self.ask_activate_skill(skill_name, context):
+                        continue
+
+                # 执行技能效果
+                skill.activate(self, context)
+
+            except Exception as e:
+                #技能异常不应打崩主流程，记录日志后跳过
+                try:
+                    game_logger.log_error(f"技能触发异常：{getattr(skill, 'name', skill.__class__.__name__)}，错误：{e}")
+                except Exception:
+                    pass
+                continue
+
+
 
 class ZhangFeiPlayer(Player):
-    """张飞武将：出的杀不限次数，技能咆哮"""
+    """张飞武将：咆哮（锁定技，被动：杀次数不受限制）"""
+
     def __init__(self, *args, **kwargs):
+        """初始化张飞玩家（仅装配元数据与技能，不改规则流程）。
+
+        Args:
+            *args: 透传给 Player 基类的参数。
+            **kwargs: 透传给 Player 基类的参数。
+
+        Returns:
+            None
+        """
         super().__init__(*args, **kwargs)
-        # 设置阵营势力
-        self.faction=Faction.SHU
-        # 设置出牌阶段技能名
-        self.skill_activate_time_with_skill[GameEvent.PLAY_CARD] = "咆哮"
 
-    def play_card_with_skill(self, available_targets: Dict[str, List[int]] = None) -> Tuple[Optional[Card], List[int]]:
-        """发动咆哮技能后的出牌阶段：直接执行技能效果"""
-        selected_card, selected_targets = self.play_card_default(available_targets)
-        # “杀”判定重置sha_used_this_turn，无限杀
-        if selected_card is not None and selected_card.name_enum == CardName.SHA:
-            self.sha_used_this_turn = False
-        return selected_card, selected_targets
+        # 设置阵营势力（元数据）
+        self.faction = Faction.SHU
 
-    def _can_play_card(self, card: Card, available_targets: Dict[str, List[int]] = None) -> bool:
-        if card.name_enum == CardName.SHA:
-            # 张飞的咆哮技能：杀不限次数，但仍需检查是否有合法目标
-            targets = self._get_targets_for_card(card, available_targets)
-            return len(targets) > 0
-        return super()._can_play_card(card, available_targets)
+        # 装配技能对象（局部导入避免循环引用）
+        from backend.player.skill.zhangfei_skill import ZhangFeiSkill
+        self.skills.append(ZhangFeiSkill())
+
 
 
 class LvmengPlayer(Player):
-    """吕蒙武将：弃牌阶段可选择发动技能"克己"，只有在本回合没有使用过杀的时候才可以不用弃牌"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        #设置阵营势力
-        self.faction = Faction.WU
-        # 设置弃牌阶段技能名
-        self.skill_activate_time_with_skill[GameEvent.DISCARD_CARD] = "克己"
+    """吕蒙武将：克己"""
 
-    def discard_card_with_skill(self) -> List[Card]:
-        """发动克己技能后的弃牌阶段：只有在本回合没有使用过杀的时候才可以不用弃牌"""
-        # 检查本回合是否使用过杀
-        if self.sha_used_this_turn:
-            # 本回合使用过杀，技能无效，执行默认弃牌流程
-            game_logger.log_info(f"{self.name} 技能[克己]失效：本回合已使用过杀，需要弃牌")
-            return self.discard_card_default()
-        else:
-            # 本回合没有使用过杀，技能生效，不弃牌
-            if len(self.hand_cards) > self.current_hp:
-                game_logger.log_info(f"{self.name} 技能[克己]生效：本回合未使用杀，不弃任何手牌")
-            else:
-                game_logger.log_info(f"{self.name} 技能[克己]生效：本回合未使用杀，手牌未超限，无需弃牌")
-            return []
+    def __init__(self, *args, **kwargs):
+        """初始化吕蒙玩家。
+
+        Args:
+            *args: 透传参数。
+            **kwargs: 透传参数。
+
+        Returns:
+            None
+        """
+        super().__init__(*args, **kwargs)
+        self.faction = Faction.WU
+
+        from backend.player.skill.lvmeng_skill import KeJiSkill
+        self.skills.append(KeJiSkill())
+
 
 
 class ZhuguoShaPlayer(Player):
@@ -754,34 +861,27 @@ class ZhuguoShaPlayer(Player):
         return []
 
 class LingcaoPlayer(Player):
-    """凌操 —— 技能：独进
-    摸牌阶段，你可以多摸 X+1 张牌（X 为你装备区的牌数 // 2）
-    """
+    """凌操武将：独进"""
+
     def __init__(self, *args, **kwargs):
+        """初始化凌操玩家（装配元数据与技能）。
+
+        Args:
+            *args: 透传给 Player 基类的参数。
+            **kwargs: 透传给 Player 基类的参数。
+
+        Returns:
+            None
+        """
         super().__init__(*args, **kwargs)
-        # 设置阵营势力
-        self.faction=Faction.WU
-        # 注册技能：在摸牌阶段生效
-        self.skill_activate_time_with_skill[GameEvent.DRAW_CARD] = "独进"
-    # -------------------------------------------------
-    # 【独进】摸牌阶段技能
-    # -------------------------------------------------
-    def draw_card_phase_with_skill(self) -> List[Card]:
-        """发动【独进】后的摸牌量计算"""
 
-        equipment_count = 0
-        if self.weapon: equipment_count += 1
-        if self.armor: equipment_count += 1
-        if self.horse_plus: equipment_count += 1
-        if self.horse_minus: equipment_count += 1
-        # X = 装备数 // 2
-        extra = (equipment_count // 2) + 1  # X + 1
-        total_draw = 2 + extra  # 默认摸 2，再加技能
-        drawn = self.deck.draw_cards(total_draw)
-        self.hand_cards.extend(drawn)
-        return drawn
+        # 中文注释：设置阵营势力
+        self.faction = Faction.WU
 
-        game_logger.log_info(f"{self.name} 发动【独进】，装备 {equipment_count} 件，额外摸 {extra} 张，共摸 {total_draw} 张")
+        # 中文注释：装配技能对象（不再使用 skill_activate_time_with_skill）
+        from backend.player.skill.lingcao_skill import DuJinSkill
+        self.skills.append(DuJinSkill())
+
 
 class CaoCaoPlayer(Player):
     """曹操 —— 技能：奸雄、护驾（主公技）"""

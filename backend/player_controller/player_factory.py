@@ -80,6 +80,16 @@ class PlayerFactory:
                 character_name=character_name,
                 player_controller=player_controller
             )
+        elif character_name == CharacterName.CAO_CAO:
+            return ZhuguoShaPlayer(
+                player_id=player_id,
+                name=name,
+                control_type=control_type,
+                deck=deck,
+                identity=identity,
+                character_name=character_name,
+                player_controller=player_controller
+            )
         else:
             # 默认创建白板武将（Player基类）
             return Player(

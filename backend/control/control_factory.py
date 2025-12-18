@@ -30,6 +30,10 @@ class ControlFactory:
         if control_type == ControlType.SIMPLE_AI:
             # 规则操控：使用SimpleControl
             return SimpleControl(player_id)
+        elif control_type == ControlType.RL:
+            # 强化学习操控：使用RLControl（纯Python实现，不依赖第三方库）
+            from backend.control.rl.rl_control import RLControl
+            return RLControl(player_id)
         elif control_type == ControlType.AI:
             # AI操控：暂时使用基类Control（后续可以实现AIControl）
             return Control(control_type, player_id)
