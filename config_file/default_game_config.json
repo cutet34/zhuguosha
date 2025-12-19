@@ -424,7 +424,7 @@
     },
     {
       "name": "反贼1",
-      "character_name": "ZHANG_FEI",
+      "character_name": "SUN_QUAN",
       "identity": "REBEL",
       "control_type": "SIMPLE_AI"
     },
@@ -436,7 +436,7 @@
     },
     {
       "name": "反贼2",
-      "character_name": "LV_MENG",
+      "character_name": "HUANG_GAI",
       "identity": "REBEL",
       "control_type": "SIMPLE_AI"
     },

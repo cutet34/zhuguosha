@@ -4,7 +4,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.player.player import Player, ZhangFeiPlayer, LvmengPlayer, LingcaoPlayer, ZhuguoShaPlayer
+from backend.player.player import (Player, ZhangFeiPlayer, LvMengPlayer, LingCaoPlayer, ZhuguoShaPlayer,
+                                   ZhouYuPlayer,SunQuanPlayer,HuangGaiPlayer)
 from backend.deck.deck import Deck
 from config.enums import ControlType, PlayerIdentity, CharacterName
 
@@ -51,7 +52,7 @@ class PlayerFactory:
                 player_controller=player_controller
             )
         elif character_name == CharacterName.LV_MENG:
-            return LvmengPlayer(
+            return LvMengPlayer(
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
@@ -61,7 +62,7 @@ class PlayerFactory:
                 player_controller=player_controller
             )
         elif character_name == CharacterName.LING_CAO:
-            return LingcaoPlayer(
+            return LingCaoPlayer(
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
@@ -82,6 +83,36 @@ class PlayerFactory:
             )
         elif character_name == CharacterName.CAO_CAO:
             return ZhuguoShaPlayer(
+                player_id=player_id,
+                name=name,
+                control_type=control_type,
+                deck=deck,
+                identity=identity,
+                character_name=character_name,
+                player_controller=player_controller
+            )
+        elif character_name == CharacterName.SUN_QUAN:
+            return SunQuanPlayer(
+                player_id=player_id,
+                name=name,
+                control_type=control_type,
+                deck=deck,
+                identity=identity,
+                character_name=character_name,
+                player_controller=player_controller
+            )
+        elif character_name == CharacterName.HUANG_GAI:
+            return HuangGaiPlayer(
+                player_id=player_id,
+                name=name,
+                control_type=control_type,
+                deck=deck,
+                identity=identity,
+                character_name=character_name,
+                player_controller=player_controller
+            )
+        elif character_name == CharacterName.ZHOU_YU:
+            return ZhouYuPlayer(
                 player_id=player_id,
                 name=name,
                 control_type=control_type,

@@ -376,6 +376,9 @@ class Player:
             # 血量降到0时进入濒死状态，不直接死亡
             game_logger.log_player_dying(self.name)
             # 濒死处理由GameController负责
+            # TODO: 若后续实现完整濒死流程（桃、酒等救援），
+            #       可在这里先进入“濒死处理”，救援失败再调用 self.die()。
+            self.die()
 
     def take_damage_with_skill(self, damage: int, source_player_id: Optional[int] = None,
                                damage_type: str = None, original_card_name: str = None) -> None:
@@ -710,6 +713,23 @@ class Player:
         """重置回合状态"""
         self.runtime_state["play_phase_executed"] = False
         self.runtime_state["sha_used_or_played_in_play_phase"] = False
+        for skill in getattr(self, "skills", []):
+            # Skill 基类中提供了默认空实现，子类按需重写
+            if hasattr(skill, "reset_turn_state"):
+                skill.reset_turn_state(self)
+    def get_skill_state(self, skill_name: str) -> Dict[str, Any]:
+        """获取某个技能的运行时状态字典。
+
+        Args:
+            skill_name: 技能名称字符串，例如 "制衡"。
+
+        Returns:
+            Dict[str, Any]: 该技能对应的状态字典，不存在时会自动创建。
+        """
+        skills_state = self.runtime_state.setdefault("skills", {})
+        state = skills_state.setdefault(skill_name, {})
+        return state
+
 
     def get_draw_num(self, base_num: int, context: Dict[str, Any]) -> int:
         """计算摸牌阶段应摸的牌数（通用钩子）。
@@ -825,7 +845,7 @@ class ZhangFeiPlayer(Player):
 
 
 
-class LvmengPlayer(Player):
+class LvMengPlayer(Player):
     """吕蒙武将：克己"""
 
     def __init__(self, *args, **kwargs):
@@ -860,7 +880,7 @@ class ZhuguoShaPlayer(Player):
         game_logger.log_info(f"{self.name} 猪国杀规则：跳过弃牌阶段")
         return []
 
-class LingcaoPlayer(Player):
+class LingCaoPlayer(Player):
     """凌操武将：独进"""
 
     def __init__(self, *args, **kwargs):
@@ -881,6 +901,70 @@ class LingcaoPlayer(Player):
         # 中文注释：装配技能对象（不再使用 skill_activate_time_with_skill）
         from backend.player.skill.lingcao_skill import DuJinSkill
         self.skills.append(DuJinSkill())
+
+class ZhouYuPlayer(Player):
+    """周瑜武将：英姿（锁定技）"""
+
+    def __init__(self, *args, **kwargs):
+        """初始化周瑜玩家，仅装配阵营与技能。
+
+        Args:
+            *args: 透传给 Player 基类的参数。
+            **kwargs: 透传给 Player 基类的参数。
+
+        Returns:
+            None: 无返回值。
+        """
+        super().__init__(*args, **kwargs)
+        # 阵营：吴
+        self.faction = Faction.WU
+
+        # 装配技能对象（只走通用钩子，不改阶段函数）
+        from backend.player.skill.zhouyu_skill import YingZiSkill
+        self.skills.append(YingZiSkill())
+
+
+class SunQuanPlayer(Player):
+    """孙权武将：制衡（简化版）"""
+
+    def __init__(self, *args, **kwargs):
+        """初始化孙权玩家，仅装配阵营与技能。
+
+        Args:
+            *args: 透传给 Player 基类的参数。
+            **kwargs: 透传给 Player 基类的参数。
+
+        Returns:
+            None: 无返回值。
+        """
+        super().__init__(*args, **kwargs)
+        # 阵营：吴
+        self.faction = Faction.WU
+
+        from backend.player.skill.sunquan_skill import ZhiHengSkill
+        self.skills.append(ZhiHengSkill())
+
+
+class HuangGaiPlayer(Player):
+    """黄盖武将：苦肉（简化版）"""
+
+    def __init__(self, *args, **kwargs):
+        """初始化黄盖玩家，仅装配阵营与技能。
+
+        Args:
+            *args: 透传给 Player 基类的参数。
+            **kwargs: 透传给 Player 基类的参数。
+
+        Returns:
+            None: 无返回值。
+        """
+        super().__init__(*args, **kwargs)
+        # 阵营：吴
+        self.faction = Faction.WU
+
+        from backend.player.skill.huanggai_skill import KuRouSkill
+        self.skills.append(KuRouSkill())
+
 
 
 class CaoCaoPlayer(Player):
