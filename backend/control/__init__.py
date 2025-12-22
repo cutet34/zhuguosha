@@ -9,3 +9,7 @@ from backend.control.simple_event_handler import (
     SimpleDrawCardEventHandler, SimplePlayCardEventHandler, SimpleHPChangeEventHandler,
     SimpleDiscardCardEventHandler, SimpleEquipChangeEventHandler, SimpleDeathEventHandler
 )
+from backend.control.human_control import HumanControl
+from backend.control.adaptive_ai_control import AdaptiveAIControl, AIDifficulty
+from backend.control.human_control import HumanControl
+from backend.control.adaptive_ai_control import AdaptiveAIControl, AIDifficulty

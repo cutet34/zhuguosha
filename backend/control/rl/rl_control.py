@@ -11,10 +11,9 @@ from backend.control.control import Control
 from .action_space import PASS_ACTION, legal_actions_from_playable_cards
 from .q_table import QTable, State, Action
 from .state_encoder import StateEncoder
-
-
-class RLControl(Control):
-    """A minimal tabular Q-learning control.
+from config.enums import CardName, ControlType
+class ExpertAIControl(Control):
+    """专家AI控制器（原 RI/RL 逻辑并入 AI.EXPERT）
 
     Design goals:
     - No third-party dependencies
@@ -23,7 +22,8 @@ class RLControl(Control):
     """
 
     def __init__(self, player_id: Optional[int] = None):
-        super().__init__(ControlType.RL, player_id)
+        # 重要：不再使用 ControlType.RL，而是归入 AI
+        super().__init__(ControlType.AI, player_id)
 
         # Learning components
         self.encoder = StateEncoder()

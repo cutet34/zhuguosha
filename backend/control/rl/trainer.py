@@ -9,7 +9,7 @@ from config.enums import ControlType, PlayerIdentity
 from config.simple_detailed_config import load_config
 
 from backend.game_controller.game_controller import GameController
-from backend.control.rl.rl_control import RLControl
+from backend.control.rl.rl_control import ExpertAIControl
 
 
 def _winner_to_side(winner_str: Optional[str]) -> str:
@@ -42,13 +42,13 @@ def _set_rl_players(config, rl_player_ids: List[int]) -> None:
             p.control_type = ControlType.RL
 
 
-def _collect_rl_controls(game: GameController) -> Dict[int, RLControl]:
+def _collect_rl_controls(game: GameController) -> Dict[int, ExpertAIControl]:
     pc = game.player_controller
     if pc is None:
         return {}
-    out: Dict[int, RLControl] = {}
+    out: Dict[int, ExpertAIControl] = {}
     for p in pc.players:
-        if isinstance(p.control, RLControl):
+        if isinstance(p.control, ExpertAIControl):
             out[p.player_id] = p.control
     return out
 

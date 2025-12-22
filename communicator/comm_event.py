@@ -71,3 +71,40 @@ class AckEvent(CommEvent):
         self.original_event_id = original_event_id
         self.success = success
         self.message = message
+class InputRequestEvent(CommEvent):
+    """后端 -> 前端：请求玩家输入（选牌/选目标/弃牌/是否发动技能）。
+
+    Args:
+        request_id: 请求唯一ID，用于匹配 InputResponseEvent。
+        player_id: 需要输入的玩家ID。
+        action: 行为类型，如 "select_card" / "select_targets" / "discard" / "ask_activate_skill"。
+        prompt: 前端提示文本。
+        options: 结构化选项数据（dict），由 action 约定字段。
+    """
+
+    def __init__(self, request_id: str, player_id: int, action: str, prompt: str = "", options: dict = None):
+        self.request_id = request_id
+        self.player_id = player_id
+        self.action = action
+        self.prompt = prompt
+        self.options = options or {}
+
+
+class InputResponseEvent(CommEvent):
+    """前端 -> 后端：提交玩家输入结果。
+
+    Args:
+        request_id: 对应 InputRequestEvent 的 request_id。
+        player_id: 玩家ID。
+        payload: 返回数据（dict），由 action 约定字段。
+            推荐：
+            - select_card: {"index": int} 或 {"cancel": True}
+            - select_targets: {"target_ids": [int,...]} 或 {"cancel": True}
+            - discard: {"indices": [int,...]}
+            - ask_activate_skill: {"activate": bool}
+    """
+
+    def __init__(self, request_id: str, player_id: int, payload: dict):
+        self.request_id = request_id
+        self.player_id = player_id
+        self.payload = payload or {}

@@ -420,7 +420,7 @@
       "name": "主公",
       "character_name": "BAI_BAN_WU_JIANG",
       "identity": "LORD",
-      "control_type": "SIMPLE_AI"
+      "control_type": "HUMAN"
     },
     {
       "name": "反贼1",

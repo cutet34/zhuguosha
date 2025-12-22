@@ -1,5 +1,5 @@
 import pygame
-from typing import Dict, List, Union
+from typing import Dict, List, Union,Optional
 from frontend.core.asset_manager import AssetManager
 from frontend.ui.card_sprite import CardSprite
 from frontend.config.player_config import PlayerConfig
@@ -35,6 +35,29 @@ class PlayerView:
             self.equipment[et] = None
         
         self.dead = False
+
+    def pick_hand_card_index_at(self, pos: tuple[int, int]) -> Optional[int]:
+        """根据鼠标坐标命中自己手牌，返回手牌索引（0-based）。
+
+        Args:
+            pos: 鼠标坐标。
+
+        Returns:
+            命中的手牌索引；未命中返回 None。
+        """
+        if not self.is_self:
+            return None
+        if not self.cards:
+            return None
+
+        # 你 draw 时会排序并重算位置，但点击发生在 draw 前/后都可能
+        # 为稳妥：点击时也保证 rect 是最新（CardView.set_position 应该会更新 rect）
+        # 如果你发现 rect 不更新，就需要在 CardView.set_position 里同步 rect
+        for i in range(len(self.cards) - 1, -1, -1):  # 从上层到下层（后画的在上面）
+            card = self.cards[i]
+            if hasattr(card, "rect") and card.rect.collidepoint(pos):
+                return i
+        return None
     
     def _get_character_pos(self):
         # 根据 player_id 和 is_self 计算位置

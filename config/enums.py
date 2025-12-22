@@ -66,7 +66,6 @@ class ControlType(Enum):
     HUMAN = "玩家操控"
     AI = "AI操控"
     SIMPLE_AI = "规则操控"
-    RL = "强化学习操控"
 
 class PlayerIdentity(Enum):
     """玩家身份枚举"""

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pygame
 from config.simple_card_config import SimpleGameConfig, SimpleCardConfig
 from config.enums import CardName
@@ -6,6 +8,9 @@ from frontend.ui.player_view import PlayerView
 from frontend.core.asset_manager import AssetManager
 from frontend.ui.card_sprite import CardSprite
 from frontend.config.card_config import CardConfig
+from frontend.util.size import CARD_SIZE
+
+
 class Renderer:
     def __init__(self, config: SimpleGameConfig, screen: pygame.Surface):
         self.config = config
@@ -59,3 +64,22 @@ class Renderer:
         # Update dirty sprites
         self.all_sprites.draw(self.screen)
         pygame.display.flip()
+
+    def get_player_at_position(self, pos: tuple[int, int]) -> Optional[int]:
+        """根据鼠标坐标获取对应玩家ID（命中角色牌区域）。
+
+        Args:
+            pos: 鼠标坐标。
+
+        Returns:
+            命中的玩家ID，未命中返回 None。
+        """
+        x, y = pos
+        for pv in self.player_views:
+            cx, cy = pv.character_pos
+            # 角色牌区域按 CARD_SIZE 近似（你绘制武将牌就是这个尺寸）
+            rect = pygame.Rect(0, 0, CARD_SIZE[0], CARD_SIZE[1])
+            rect.center = (cx, cy)
+            if rect.collidepoint(x, y) and not pv.dead:
+                return pv.id
+        return None
