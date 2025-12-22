@@ -4,7 +4,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.player.player import Player, ZhangFeiPlayer, LvmengPlayer, LingcaoPlayer
+from backend.player.player import Player, ZhangFeiPlayer, LvMengPlayer, LingCaoPlayer
 from backend.deck.deck import Deck
 from backend.card.card import Card
 from config.simple_card_config import SimpleGameConfig, SimpleCardConfig, SimplePlayerConfig
@@ -60,7 +60,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lvmeng_skill_keji_no_sha(self):
         """测试吕蒙技能克己：本回合未使用杀时不弃牌"""
-        lvmeng = LvmengPlayer(1, "吕蒙", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LV_MENG)
+        lvmeng = LvMengPlayer(1, "吕蒙", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LV_MENG)
         
         # 清空初始手牌，然后添加6张牌
         lvmeng.hand_cards.clear()
@@ -78,7 +78,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lvmeng_skill_keji_with_sha(self):
         """测试吕蒙技能克己：本回合使用过杀时需要弃牌"""
-        lvmeng = LvmengPlayer(1, "吕蒙", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LV_MENG)
+        lvmeng = LvMengPlayer(1, "吕蒙", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LV_MENG)
         
         # 清空初始手牌，然后添加6张牌
         lvmeng.hand_cards.clear()
@@ -96,7 +96,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lingcao_skill_dujin_no_equipment(self):
         """测试凌操技能独进：无装备时摸3张"""
-        lingcao = LingcaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
+        lingcao = LingCaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
         
         initial_hand_size = len(lingcao.hand_cards)
         initial_deck_size = len(self.deck.cards)
@@ -111,7 +111,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lingcao_skill_dujin_with_equipment(self):
         """测试凌操技能独进：有装备时摸牌数量增加"""
-        lingcao = LingcaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
+        lingcao = LingCaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
         
         # 装备2件装备（使用装备管理器）
         weapon = Card(CardSuit.SPADES, 6, CardName.QING_GANG_JIAN)
@@ -132,7 +132,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lingcao_skill_dujin_four_equipment(self):
         """测试凌操技能独进：4件装备时摸5张"""
-        lingcao = LingcaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
+        lingcao = LingCaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
         
         # 装备4件装备（使用装备管理器）
         weapon = Card(CardSuit.SPADES, 6, CardName.QING_GANG_JIAN)
@@ -155,7 +155,7 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_lingcao_skill_dujin_not_activate(self):
         """测试凌操技能独进：可以选择不发动技能，此时摸2张（默认摸牌）"""
-        lingcao = LingcaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
+        lingcao = LingCaoPlayer(1, "凌操", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.LING_CAO)
         
         initial_hand_size = len(lingcao.hand_cards)
         initial_deck_size = len(self.deck.cards)
