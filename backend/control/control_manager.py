@@ -214,10 +214,18 @@ class ControlManager:
                 continue
             
             # 其他玩家只能看到公开信息
+            # 中文注释：主公身份公开；其余身份对非本人不可见。
+            other_identity = None
+            try:
+                if other_player.identity and other_player.identity.value == "主公":
+                    other_identity = other_player.identity.value
+            except Exception:
+                other_identity = None
+
             players_info.append({
                 "player_id": other_player.player_id,
                 "name": other_player.name,
-                "identity": other_player.identity.value if other_player.identity else None,
+                "identity": other_identity,
                 "character": other_player.character_name.value if other_player.character_name else None,
                 "max_hp": other_player.max_hp,
                 "current_hp": other_player.current_hp,

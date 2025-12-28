@@ -5,7 +5,6 @@ import os
 
 from backend.card.card import Card
 from backend.control.control import Control
-from backend.control.simple_control import SimpleControl
 from backend.control.ai_difficulty import AIDifficulty
 from backend.control.basic_ai_control import BasicAIControl
 from backend.control.hard_ai_control import HardAIControl
@@ -49,14 +48,11 @@ class AdaptiveAIControl(Control):
         Returns:
             Control 实例。
         """
-        # 你这次的约定：
-        # - EASY  -> SimpleControl（入门级规则/启发式）
-        # - MEDIUM-> BasicAIControl（中等：基础策略）
-        # - HARD  -> HardAIControl（困难：牌价值判断）
-        # - EXPERT-> ExpertAIControl（强化学习/RI）
+
+        # - EASY：基础 AI（BasicAIControl），实现“濒死吃桃/有牌就响应/攻击主公者为反”等最基本规则。
+        # - HARD：困难 AI（HardAIControl），在 Basic 的基础上加入更复杂的评分策略。
+        # - EXPERT：强化学习控制器。
         if self.difficulty == AIDifficulty.EASY:
-            return SimpleControl(self.player_id)
-        if self.difficulty == AIDifficulty.MEDIUM:
             return BasicAIControl(self.player_id)
         if self.difficulty == AIDifficulty.HARD:
             return HardAIControl(self.player_id)

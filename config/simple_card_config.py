@@ -158,7 +158,24 @@ class SimpleGameConfig:
                         f"'players[{idx}].ai_difficulty' 必须是字符串或 None，实际类型: {type(player_data['ai_difficulty'])}"
                     )
                 else:
-                    ai_difficulty = player_data["ai_difficulty"].strip() or None
+                    raw = player_data["ai_difficulty"].strip().lower()
+                    ai_difficulty = raw or None
+
+            # 仅当 control_type=AI 时校验/兼容 ai_difficulty；否则忽略
+            if ai_difficulty is not None:
+                if control_type != ControlType.AI:
+                    ai_difficulty = None
+                else:
+                    alias = {
+                        "simple": "easy",
+                        "basic": "medium",
+                    }
+                    ai_difficulty = alias.get(ai_difficulty, ai_difficulty)
+                    allowed = {"easy", "medium", "hard", "expert"}
+                    if ai_difficulty not in allowed:
+                        raise ValueError(
+                            f"'players[{idx}].ai_difficulty' 无效: {player_data['ai_difficulty']!r}，允许值: {sorted(allowed)}"
+                        )
             
             player_config = SimplePlayerConfig(
                 name=player_data["name"],

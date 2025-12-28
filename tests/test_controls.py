@@ -23,7 +23,6 @@ from backend.control.hard_ai_control import HardAIControl
 from backend.control.ai_difficulty import AIDifficulty
 from backend.control.control import Control
 from backend.control.human_control import HumanControl
-from backend.control.simple_control import SimpleControl
 from backend.control.rl.rl_control import ExpertAIControl
 from backend.control.rl.action_space import PASS_ACTION
 from communicator.comm_event import InputRequestEvent, InputResponseEvent
@@ -168,6 +167,9 @@ def test_basic_ai_chooses_sha_when_attackable_exists() -> None:
         None
     """
     ai = BasicAIControl(player_id=1)
+    # 中文注释：不提供状态时 BasicAI 会认为自己 0/4（残血），从而优先吃桃。
+    # 这里显式同步满血状态，验证“有可攻击目标时会出杀”。
+    ai.sync_state({"self": {"current_hp": 4, "max_hp": 4}, "players": []})
 
     cards = [
         Card(CardSuit.HEARTS, 7, CardName.SHA),
@@ -195,8 +197,8 @@ def test_basic_ai_select_targets_all_for_aoe() -> None:
 
 
 
-def test_simple_control_picks_equipment_first() -> None:
-    """SimpleControl（用于 EASY）：有装备时应优先装备。
+def test_basic_ai_picks_equipment_first() -> None:
+    """BasicAIControl：装备应优先出。
 
     Args:
         None
@@ -204,14 +206,13 @@ def test_simple_control_picks_equipment_first() -> None:
     Returns:
         None
     """
-    ctrl = SimpleControl(player_id=1)
+    ai = BasicAIControl(player_id=1)
     cards = [
-        Card(CardSuit.SPADES, 6, CardName.QING_GANG_JIAN),
         Card(CardSuit.HEARTS, 7, CardName.SHA),
-        Card(CardSuit.HEARTS, 2, CardName.SHAN),
+        Card(CardSuit.SPADES, 6, CardName.QING_GANG_JIAN),
     ]
-    picked = ctrl.select_card(cards, available_targets={"all": [2], "attackable": [2]})
-    assert picked is cards[0]
+    picked = ai.select_card(cards, available_targets={"all": [2], "attackable": [2]})
+    assert picked is cards[1]
 
 
 def test_hard_ai_prefers_tao_by_value() -> None:
@@ -324,7 +325,7 @@ def test_adaptive_ai_delegates_by_difficulty() -> None:
         None
     """
     ai_easy = AdaptiveAIControl(player_id=1, difficulty=AIDifficulty.EASY)
-    assert isinstance(ai_easy._delegate, SimpleControl)
+    assert isinstance(ai_easy._delegate, BasicAIControl)
 
     ai_medium = AdaptiveAIControl(player_id=1, difficulty=AIDifficulty.MEDIUM)
     assert isinstance(ai_medium._delegate, BasicAIControl)
@@ -350,8 +351,8 @@ def test_adaptive_ai_syncs_use_skill_flag() -> None:
     assert ai.ask_activate_skill("任意技能", {"event_type": "TEST"}) is False
 
 
-def test_simple_control_prefers_equipment() -> None:
-    """SimpleControl（EASY delegate）：优先选择装备牌。
+def test_basic_ai_select_targets_all_for_aoe_via_delegate() -> None:
+    """BasicAIControl：群体牌（TargetType.ALL）应选择所有目标（通过直接实例验证）。
 
     Args:
         None
@@ -359,14 +360,11 @@ def test_simple_control_prefers_equipment() -> None:
     Returns:
         None
     """
-    ai = SimpleControl(player_id=1)
-    cards = [
-        Card(CardSuit.SPADES, 6, CardName.QING_GANG_JIAN),
-        Card(CardSuit.HEARTS, 7, CardName.SHA),
-        Card(CardSuit.HEARTS, 2, CardName.SHAN),
-    ]
-    picked = ai.select_card(cards, available_targets={"all": [2], "attackable": [2]})
-    assert picked is cards[0]
+    ai = BasicAIControl(player_id=1)
+    card = Card(CardSuit.HEARTS, 8, CardName.NAN_MAN_RU_QIN)
+    assert card.target_type == TargetType.ALL
+    targets = ai.select_targets([2, 3], card)
+    assert targets == [2, 3]
 
 
 def test_hard_ai_prefers_tao_when_available() -> None:
