@@ -18,7 +18,8 @@ class PlayerView:
         self.config = config
         self.id = player_id
         self.is_self = is_self
-        
+        self.hand_click_rects: list[pygame.Rect] = []
+
         # 计算 max_hp：根据武将和身份动态计算（与后端逻辑一致）
         self.max_hp = self._calculate_max_hp()
         self.hp = self.max_hp
@@ -37,28 +38,22 @@ class PlayerView:
         self.dead = False
 
     def pick_hand_card_index_at(self, pos: tuple[int, int]) -> Optional[int]:
-        """根据鼠标坐标命中自己手牌，返回手牌索引（0-based）。
-
-        Args:
-            pos: 鼠标坐标。
-
-        Returns:
-            命中的手牌索引；未命中返回 None。
-        """
-        if not self.is_self:
-            return None
-        if not self.cards:
+        if not self.is_self or not self.cards:
             return None
 
-        # 你 draw 时会排序并重算位置，但点击发生在 draw 前/后都可能
-        # 为稳妥：点击时也保证 rect 是最新（CardView.set_position 应该会更新 rect）
-        # 如果你发现 rect 不更新，就需要在 CardView.set_position 里同步 rect
-        for i in range(len(self.cards) - 1, -1, -1):  # 从上层到下层（后画的在上面）
-            card = self.cards[i]
-            if hasattr(card, "rect") and card.rect.collidepoint(pos):
+        # 有 click_rects 就用它（解决重叠遮挡）
+        if getattr(self, "hand_click_rects", None) and len(self.hand_click_rects) == len(self.cards):
+            for i in range(len(self.cards) - 1, -1, -1):
+                if self.hand_click_rects[i].collidepoint(pos):
+                    return i
+            return None
+
+        # 兜底：没有 click_rects 就用整张 rect
+        for i in range(len(self.cards) - 1, -1, -1):
+            if self.cards[i].rect.collidepoint(pos):
                 return i
         return None
-    
+
     def _get_character_pos(self):
         # 根据 player_id 和 is_self 计算位置
         screen_width, screen_height = pygame.display.get_surface().get_size()
@@ -109,8 +104,7 @@ class PlayerView:
             return
         if not self.cards or len(self.cards) == 0:
             return
-        _sorted_cards = sorted(self.cards, key=lambda c: (c.config.name.value, c.config.suit.value, c.config.rank))
-        self.cards = _sorted_cards
+
         # 重新计算卡牌位置
         self._recalculate_card_positions(screen)
         # 绘制卡牌
@@ -229,26 +223,62 @@ class PlayerView:
             return base_max_hp + 1
         else:
             return base_max_hp
-    
-    def _recalculate_card_positions(self, screen: pygame.Surface):
-        """重新计算手牌位置"""
+
+    def _recalculate_card_positions(self, screen: pygame.Surface) -> None:
+        """重新计算手牌位置，并生成可点击的可见区域（解决重叠导致点不到的问题）。"""
         if not self.cards:
             return
 
-        card_cnt = len(self.cards)
-        spacing = 10  # 手牌间距
-        if card_cnt % 2 == 1:
-            card_left_center = self.card_center_pos[0] - (card_cnt // 2) * (CARD_SIZE[0] + spacing // 2)
-            card_right_center = self.card_center_pos[0] + (card_cnt // 2) * (CARD_SIZE[0] + spacing // 2)
-        else:
-            card_left_center = self.card_center_pos[0] - (card_cnt // 2 - 0.5) * (CARD_SIZE[0] + spacing // 2)
-            card_right_center = self.card_center_pos[0] + (card_cnt // 2 - 0.5) * (CARD_SIZE[0] + spacing // 2)
-        card_left_center = max(card_left_center, CARD_SIZE[0] // 2 + 10)  # 防止超出左边界
-        card_right_center = min(card_right_center, self.character_pos[0] - CARD_SIZE[0] - 10)  # 防止超出右边界
-        spacing = (card_right_center - card_left_center) / (card_cnt - 1) - CARD_SIZE[0] if card_cnt > 1 else 0
-
-        start_x = card_left_center
+        n = len(self.cards)
+        center_x = self.card_center_pos[0]
         y = self.card_center_pos[1]
+
+        # 用真实卡面宽高，不要用 CARD_SIZE（否则图片尺寸不一致会错）
+        w = self.cards[0].rect.width
+        h = self.cards[0].rect.height
+
+        left_bound = w // 2 + 10
+        right_bound = self.character_pos[0] - w // 2 - 10
+        if right_bound <= left_bound:
+            right_bound = left_bound + 1
+
+        max_span = right_bound - left_bound
+        if n == 1:
+            x0 = max(min(center_x, right_bound), left_bound)
+            self.cards[0].set_position((x0, y))
+        else:
+            # step = 相邻中心点距离；牌多时允许重叠
+            step_max = w + 10
+            step_min = max(22, int(w * 0.30))  # 至少露出 30% 宽度（否则左牌会被完全盖住）
+            step = max_span / (n - 1)
+            step = max(step_min, min(step, step_max))
+
+            span = step * (n - 1)
+            start_x = center_x - span / 2
+            if start_x < left_bound:
+                start_x = left_bound
+            if start_x + span > right_bound:
+                start_x = right_bound - span
+
+            for i, card in enumerate(self.cards):
+                x = start_x + i * step
+                card.set_position((x, y))
+
+        # ---------- 关键：生成“可点击的可见区域” ----------
+        self.hand_click_rects = []
         for i, card in enumerate(self.cards):
-            x = start_x + i * (CARD_SIZE[0] + spacing)
-            card.set_position((x, y))
+            r = card.rect.copy()
+
+            # 如果有下一张牌覆盖，裁掉被覆盖的右侧区域
+            if i < n - 1:
+                next_left = self.cards[i + 1].rect.left
+                # 让当前牌可点区域的 right 不超过 next_left-1
+                r.right = min(r.right, next_left - 1)
+
+            # 保底：如果被裁到没有宽度，给它留一条可点的细条
+            if r.width < 6:
+                r.right = card.rect.left + 6
+
+            self.hand_click_rects.append(r)
+
+
