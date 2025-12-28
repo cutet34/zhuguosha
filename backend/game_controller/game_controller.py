@@ -176,5 +176,12 @@ class GameController:
     
     def _cleanup(self) -> None:
         """善后工作（回收内存等）"""
-        # 预留接口，具体实现待补充
-        pass
+        # 目前主要用于关闭 PlayerController 中的后台线程（如前端输入分发器）
+        try:
+            if self.player_controller is not None:
+                stop = getattr(self.player_controller, "stop", None)
+                if callable(stop):
+                    stop()
+        except Exception:
+            # 清理不应影响正常结束
+            pass

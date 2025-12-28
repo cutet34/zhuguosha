@@ -4,11 +4,19 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.player.player import Player, ZhangFeiPlayer, LvMengPlayer, LingCaoPlayer
+from backend.player.player import (
+    Player,
+    ZhangFeiPlayer,
+    LvMengPlayer,
+    LingCaoPlayer,
+    ZhouYuPlayer,
+    SunQuanPlayer,
+    HuangGaiPlayer,
+)
 from backend.deck.deck import Deck
 from backend.card.card import Card
 from config.simple_card_config import SimpleGameConfig, SimpleCardConfig, SimplePlayerConfig
-from config.enums import CardSuit, CardName, ControlType, PlayerIdentity, CharacterName
+from config.enums import CardSuit, CardName, ControlType, PlayerIdentity, CharacterName, GameEvent
 
 
 class TestCharacterSkills(unittest.TestCase):
@@ -34,14 +42,14 @@ class TestCharacterSkills(unittest.TestCase):
     
     def test_zhangfei_skill_paoxiao(self):
         """测试张飞技能咆哮：出的杀不限次数"""
-        zhangfei = ZhangFeiPlayer(1, "张飞", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.ZHANG_FEI)
+        zhangfei = ZhangFeiPlayer(1, "张飞", ControlType.SIMPLE_AI, self.deck, PlayerIdentity.REBEL, CharacterName.ZHANG_FEI)
         
         # 给张飞多张杀牌
         sha_cards = [Card(CardSuit.HEARTS, i + 1, CardName.SHA) for i in range(3)]
         zhangfei.hand_cards = sha_cards
         
         # 创建目标玩家
-        target_player = Player(2, "目标", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.BAI_BAN_WU_JIANG)
+        target_player = Player(2, "目标", ControlType.SIMPLE_AI, self.deck, PlayerIdentity.REBEL, CharacterName.BAI_BAN_WU_JIANG)
         available_targets = {"attackable": [target_player.player_id]}
         
         # 第一次出杀
@@ -170,6 +178,61 @@ class TestCharacterSkills(unittest.TestCase):
         self.assertEqual(len(drawn_cards), 2)
         self.assertEqual(len(lingcao.hand_cards), initial_hand_size + 2)
         self.assertEqual(len(self.deck.cards), initial_deck_size - 2)
+
+    def test_zhouyu_skill_yingzi_draw_plus_one(self):
+        """测试周瑜技能英姿：摸牌阶段额定摸牌数 +1（通过 modify_draw_num 钩子）。"""
+        zhouyu = ZhouYuPlayer(1, "周瑜", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.ZHOU_YU)
+
+        initial_hand_size = len(zhouyu.hand_cards)
+        initial_deck_size = len(self.deck.cards)
+
+        drawn_cards = zhouyu.draw_card_phase()
+
+        # 默认摸牌 2 + 英姿 +1 => 3
+        self.assertEqual(len(drawn_cards), 3)
+        self.assertEqual(len(zhouyu.hand_cards), initial_hand_size + 3)
+        self.assertEqual(len(self.deck.cards), initial_deck_size - 3)
+
+    def test_sunquan_skill_zhiheng_discard_and_draw_same_count(self):
+        """测试孙权技能制衡：弃置任意张（此版本无选择接口时退化为弃置全部），摸等量牌。"""
+        sunquan = SunQuanPlayer(1, "孙权", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.SUN_QUAN)
+
+        # 固定手牌为 3 张，避免受初始发牌影响
+        sunquan.hand_cards.clear()
+        for i in range(3):
+            sunquan.hand_cards.append(Card(CardSuit.HEARTS, i + 1, CardName.SHA))
+
+        skill = sunquan.skills[0]
+        context = {"event_type": GameEvent.PLAY_CARD}
+        self.assertTrue(skill.can_activate(sunquan, context))
+
+        discard_before = len(self.deck.discard_pile)
+        hand_before = len(sunquan.hand_cards)
+
+        skill.activate(sunquan, context)
+
+        # 退化为“弃置全部手牌”：弃 3 摸 3，最终手牌数量不变
+        self.assertEqual(len(sunquan.hand_cards), hand_before)
+        self.assertEqual(len(self.deck.discard_pile), discard_before + hand_before)
+
+    def test_huanggai_skill_kurou_hp_minus_one_draw_two(self):
+        """测试黄盖技能苦肉：失去 1 点体力，摸 2 张牌。"""
+        huanggai = HuangGaiPlayer(1, "黄盖", ControlType.AI, self.deck, PlayerIdentity.REBEL, CharacterName.HUANG_GAI)
+
+        # 为了避免直接进入死亡流程，确保体力至少为 2
+        huanggai.current_hp = 2
+
+        skill = huanggai.skills[0]
+        context = {"event_type": GameEvent.PLAY_CARD}
+        self.assertTrue(skill.can_activate(huanggai, context))
+
+        hp_before = huanggai.current_hp
+        hand_before = len(huanggai.hand_cards)
+
+        skill.activate(huanggai, context)
+
+        self.assertEqual(huanggai.current_hp, hp_before - 1)
+        self.assertEqual(len(huanggai.hand_cards), hand_before + 2)
 
 
 if __name__ == '__main__':

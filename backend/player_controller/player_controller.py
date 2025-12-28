@@ -10,6 +10,8 @@ from backend.utils.logger import game_logger
 from backend.player_controller.player_factory import PlayerFactory
 from backend.control.control_manager import ControlManager
 from backend.utils.event_sender import set_control_manager
+from backend.utils.event_sender import get_wait_for_ack
+from backend.utils.input_dispatcher import FrontendInputDispatcher
 from config.enums import GameEvent, ControlType, PlayerIdentity, CharacterName, TargetType
 
 
@@ -37,6 +39,24 @@ class PlayerController:
         
         # 初始化时同步一次状态
         self.control_manager.sync_game_state()
+
+        # 集成模式下：启动前端输入分发线程（HumanControl 依赖它接收 InputResponseEvent）
+        self._input_dispatcher: Optional[FrontendInputDispatcher] = None
+        if get_wait_for_ack():
+            self._input_dispatcher = FrontendInputDispatcher(self.control_manager)
+            self._input_dispatcher.start()
+
+    def stop(self) -> None:
+        """停止PlayerController内部线程（目前主要是前端输入分发器）。
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        if self._input_dispatcher is not None:
+            self._input_dispatcher.stop(wait=False)
     
     def _initialize_players(self) -> None:
         """根据配置信息生成玩家列表"""
@@ -49,6 +69,7 @@ class PlayerController:
                 player_id=player_id,
                 name=player_config.name,
                 control_type=player_config.control_type,
+                ai_difficulty=getattr(player_config, "ai_difficulty", None),
                 deck=self.deck,
                 character_name=player_config.character_name,
                 identity=player_config.identity,

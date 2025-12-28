@@ -1,95 +1,16 @@
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any, Dict, List, Optional
 import os
-import random
 
+from backend.card.card import Card
 from backend.control.control import Control
 from backend.control.simple_control import SimpleControl
-from backend.card.card import Card
-from config.enums import ControlType, CardName, TargetType
+from backend.control.ai_difficulty import AIDifficulty
+from backend.control.basic_ai_control import BasicAIControl
+from backend.control.hard_ai_control import HardAIControl
 
-
-class AIDifficulty(Enum):
-    """AI 难度枚举。"""
-    EASY = "easy"
-    MEDIUM = "medium"
-    HARD = "hard"
-    EXPERT = "expert"
-
-
-class BasicAIControl(Control):
-    """中等难度基础策略AI。
-
-    Args:
-        player_id: 玩家ID。
-
-    Returns:
-        None
-    """
-
-    def __init__(self, player_id: int):
-        super().__init__(ControlType.AI, player_id)
-
-    def select_card(
-        self,
-        available_cards: List[Card],
-        context: str = "",
-        available_targets: Dict[str, List[int]] = None
-    ) -> Optional[Card]:
-        """选择要出的牌。
-
-        Args:
-            available_cards: 可选牌列表。
-            context: 上下文。
-            available_targets: 可用目标字典。
-
-        Returns:
-            选中的牌或 None。
-        """
-        if not available_cards:
-            return None
-
-        targets_all = (available_targets or {}).get("all", [])
-        targets_attackable = (available_targets or {}).get("attackable", [])
-
-        # 1) 优先装备
-        for c in available_cards:
-            if c.is_equipment():
-                return c
-
-        # 2) 群体牌：目标多时优先
-        aoe_names = {CardName.NAN_MAN_RU_QIN, CardName.WAN_JIAN_QI_FA}
-        for c in available_cards:
-            if c.name_enum in aoe_names and len(targets_all) >= 2:
-                return c
-
-        # 3) 进攻：杀/决斗
-        for c in available_cards:
-            if c.name_enum == CardName.SHA and len(targets_attackable) >= 1:
-                return c
-        for c in available_cards:
-            if c.name_enum == CardName.JUE_DOU and len(targets_all) >= 1:
-                return c
-
-        return random.choice(available_cards)
-
-    def select_targets(self, available_targets: List[int], card: Optional[Card] = None) -> List[int]:
-        """选择目标。
-
-        Args:
-            available_targets: 可选目标。
-            card: 当前牌。
-
-        Returns:
-            目标列表。
-        """
-        if not available_targets:
-            return []
-        if card is not None and getattr(card, "target_type", None) == TargetType.ALL:
-            return list(available_targets)
-        return [random.choice(available_targets)]
+from config.enums import ControlType, CardName
 
 
 class AdaptiveAIControl(Control):
@@ -128,18 +49,48 @@ class AdaptiveAIControl(Control):
         Returns:
             Control 实例。
         """
+        # 你这次的约定：
+        # - EASY  -> SimpleControl（入门级规则/启发式）
+        # - MEDIUM-> BasicAIControl（中等：基础策略）
+        # - HARD  -> HardAIControl（困难：牌价值判断）
+        # - EXPERT-> ExpertAIControl（强化学习/RI）
         if self.difficulty == AIDifficulty.EASY:
-            return Control(ControlType.AI, self.player_id)  # 基类随机
+            return SimpleControl(self.player_id)
         if self.difficulty == AIDifficulty.MEDIUM:
             return BasicAIControl(self.player_id)
         if self.difficulty == AIDifficulty.HARD:
-            return SimpleControl(self.player_id)
+            return HardAIControl(self.player_id)
         if self.difficulty == AIDifficulty.EXPERT:
-            # 原 RI/RL 逻辑并入 EXPERT
             from backend.control.rl.rl_control import ExpertAIControl
             return ExpertAIControl(self.player_id)
 
-        return SimpleControl(self.player_id)
+        return HardAIControl(self.player_id)
+
+    # -------------------- RL/RI 训练接口转发（EXPERT 难度可用） --------------------
+    def set_training_params(self, **kwargs: Any) -> None:
+        """向子策略转发训练参数（若支持）。
+
+        Args:
+            **kwargs: 训练器传入的参数。
+
+        Returns:
+            None
+        """
+        fn = getattr(self._delegate, "set_training_params", None)
+        if callable(fn):
+            fn(**kwargs)
+
+    def begin_episode(self) -> None:
+        """开始新一局训练（若支持）。"""
+        fn = getattr(self._delegate, "begin_episode", None)
+        if callable(fn):
+            fn()
+
+    def end_episode(self, reward: float) -> None:
+        """结束一局训练并回传终局奖励（若支持）。"""
+        fn = getattr(self._delegate, "end_episode", None)
+        if callable(fn):
+            fn(reward)
 
     def _sync_delegate_state(self) -> None:
         """同步关键状态到 delegate。
@@ -168,6 +119,20 @@ class AdaptiveAIControl(Control):
         """转发弃牌选择。"""
         self._sync_delegate_state()
         return self._delegate.select_cards_to_discard(hand_cards, count)
+
+    def select_cards_to_discard_any(
+        self,
+        hand_cards: List[Card],
+        max_count: int,
+        min_count: int = 0,
+        context: str = "",
+    ) -> List[Card]:
+        """转发可变数量弃牌选择（用于技能如【制衡】）。"""
+        self._sync_delegate_state()
+        fn = getattr(self._delegate, "select_cards_to_discard_any", None)
+        if callable(fn):
+            return fn(hand_cards, max_count, min_count, context)
+        return super().select_cards_to_discard_any(hand_cards, max_count, min_count, context)
 
     def ask_use_card_response(self, card_name: CardName, available_cards: List[Card], context: str = "") -> Optional[Card]:
         """转发响应牌选择。"""

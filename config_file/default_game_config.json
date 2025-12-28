@@ -418,19 +418,19 @@
   "players": [
     {
       "name": "主公",
-      "character_name": "BAI_BAN_WU_JIANG",
+      "character_name": "SUN_QUAN",
       "identity": "LORD",
       "control_type": "HUMAN"
     },
     {
       "name": "反贼1",
-      "character_name": "SUN_QUAN",
+      "character_name": "ZHANG_FEI",
       "identity": "REBEL",
       "control_type": "SIMPLE_AI"
     },
     {
       "name": "忠臣",
-      "character_name": "BAI_BAN_WU_JIANG",
+      "character_name": "LV_MENG",
       "identity": "LOYALIST",
       "control_type": "SIMPLE_AI"
     },

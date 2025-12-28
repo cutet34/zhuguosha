@@ -20,6 +20,8 @@ class SimplePlayerConfig:
     character_name: CharacterName = CharacterName.BAI_BAN_WU_JIANG  # 武将名
     identity: PlayerIdentity = PlayerIdentity.REBEL  # 身份
     control_type: ControlType = ControlType.AI  # 操控类型
+    # 可选：当 control_type=AI 时指定难度（easy/medium/hard/expert），用于同局多AI混搭。
+    ai_difficulty: str | None = None
 
 
 @dataclass
@@ -145,12 +147,25 @@ class SimpleGameConfig:
                 control_type = ControlType[player_data["control_type"]]
             except KeyError:
                 raise ValueError(f"'players[{idx}].control_type' 无效的枚举值: {player_data['control_type']}")
+
+            # 可选字段：ai_difficulty（仅当 control_type=AI 时生效）
+            ai_difficulty = None
+            if "ai_difficulty" in player_data:
+                if player_data["ai_difficulty"] is None:
+                    ai_difficulty = None
+                elif not isinstance(player_data["ai_difficulty"], str):
+                    raise TypeError(
+                        f"'players[{idx}].ai_difficulty' 必须是字符串或 None，实际类型: {type(player_data['ai_difficulty'])}"
+                    )
+                else:
+                    ai_difficulty = player_data["ai_difficulty"].strip() or None
             
             player_config = SimplePlayerConfig(
                 name=player_data["name"],
                 character_name=character_name,
                 identity=identity,
-                control_type=control_type
+                control_type=control_type,
+                ai_difficulty=ai_difficulty,
             )
             players_config.append(player_config)
         
@@ -191,7 +206,8 @@ class SimpleGameConfig:
                     "name": player.name,
                     "character_name": player.character_name.name,
                     "identity": player.identity.name,
-                    "control_type": player.control_type.name
+                    "control_type": player.control_type.name,
+                    **({"ai_difficulty": player.ai_difficulty} if getattr(player, "ai_difficulty", None) else {}),
                 }
                 for player in self.players_config
             ],

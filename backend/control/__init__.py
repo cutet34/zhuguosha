@@ -11,5 +11,5 @@ from backend.control.simple_event_handler import (
 )
 from backend.control.human_control import HumanControl
 from backend.control.adaptive_ai_control import AdaptiveAIControl, AIDifficulty
-from backend.control.human_control import HumanControl
-from backend.control.adaptive_ai_control import AdaptiveAIControl, AIDifficulty
+from backend.control.basic_ai_control import BasicAIControl
+from backend.control.hard_ai_control import HardAIControl

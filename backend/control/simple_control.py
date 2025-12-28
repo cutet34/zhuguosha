@@ -541,9 +541,33 @@ class SimpleControl(Control):
             return None
         
         # 获取身份和状态信息（只获取一次）
+        # 中文注释：在未接入 ControlManager 同步状态时（例如单元测试/离线调用），game_state 可能为空。
+        # 这时 SimpleControl 应当提供“保底策略”，避免直接返回 None 导致无法出牌。
         my_identity = self._get_my_identity()
         my_hp = self.internal_state.get("self", {}).get("current_hp", 0)
         my_max_hp = self.game_state.get("self", {}).get("max_hp", 4) if self.game_state else 4
+
+        # 中文注释：无身份信息时，采用最朴素的出牌策略（不做身份推断、不重算距离）。
+        # 该分支主要用于：
+        # - 单元测试直接创建 Player（没有 ControlManager.sync_state）
+        # - 早期/简化模式下的离线对局
+        if my_identity is None:
+            targets_attackable = (available_targets or {}).get("attackable", [])
+            targets_all = (available_targets or {}).get("all", []) or targets_attackable
+
+            for card in available_cards:
+                if card.name_enum == CardName.TAO and my_hp < my_max_hp:
+                    return card
+                if card.name_enum in (CardName.NAN_MAN_RU_QIN, CardName.WAN_JIAN_QI_FA):
+                    return card
+                if card.card_type == CardType.EQUIPMENT:
+                    return card
+                if card.name_enum == CardName.JUE_DOU and targets_all:
+                    return card
+                if card.name_enum == CardName.SHA and targets_attackable:
+                    return card
+
+            return None
         
         # 从左往右遍历每张牌，根据对应牌思考是否应该出
         for card in available_cards:

@@ -35,7 +35,19 @@ class Player:
         """
         return 4
     
-    def __init__(self, player_id: int, name: str, control_type: ControlType, deck: Deck, identity: PlayerIdentity = None, character_name: CharacterName = None, player_controller = None,faction: Faction = None,gender:Gender = None) :
+    def __init__(
+        self,
+        player_id: int,
+        name: str,
+        control_type: ControlType,
+        deck: Deck,
+        identity: PlayerIdentity = None,
+        character_name: CharacterName = None,
+        player_controller=None,
+        faction: Faction = None,
+        gender: Gender = None,
+        ai_difficulty: Optional[str] = None,
+    ):
         """初始化函数
         
         Args:
@@ -80,10 +92,12 @@ class Player:
         self.phase_skill_manager = PhaseSkillManager()
         
         # 操控模块（使用工厂模式创建）
-        self.control = ControlFactory.create_control(control_type, player_id)
+        self.control = ControlFactory.create_control(control_type, player_id, ai_difficulty=ai_difficulty)
         
         # 回合状态跟踪
-        self.sha_used_this_turn = False  # 当前回合是否已使用杀
+        # 中文注释：本回合出牌阶段是否使用过【杀】。
+        # 规则：默认每回合只能使用 1 张【杀】；诸葛连弩/咆哮等会放宽该限制。
+        self.sha_used_this_turn = False
         self.player_controller = player_controller  # 玩家控制器引用
         
         # 伤害来源追踪
@@ -227,7 +241,17 @@ class Player:
             if hasattr(self.control, 'filter_attackable_targets'):
                 targets = self.control.filter_attackable_targets(targets, available_targets)
         if selected_card is not None and selected_card.name_enum == CardName.SHA:
+            # 中文注释：记录“出牌阶段使用过杀”，供部分技能/规则近似判断使用。
             self.runtime_state["sha_used_or_played_in_play_phase"] = True
+            # 中文注释：标记本回合出牌阶段使用过【杀】。
+            self.sha_used_this_turn = True
+
+            # 中文注释：兼容旧逻辑——部分实现（及测试）期望“咆哮”通过重置该标记来实现无限杀。
+            # 我们通过技能标记来区分：只有带该标记的技能才会重置。
+            for skill in getattr(self, "skills", []):
+                if bool(getattr(skill, "reset_sha_used_flag_after_sha", False)):
+                    self.sha_used_this_turn = False
+                    break
 
         # 如果是自己类型的牌，直接使用自己
         if selected_card.target_type == TargetType.SELF:
@@ -532,11 +556,12 @@ class Player:
             是否可以出牌
         """
         # 杀牌判断
-        # 中文注释：若已使用过杀，则只有在上限 > 1（或无限）时仍允许继续出杀
-        limit = self.get_sha_limit({"available_targets": available_targets})
-        if self.sha_used_this_turn and limit <= 1:
-            return False
-
+        # 中文注释：只对【杀】应用“每回合使用次数上限”限制。
+        if card.name_enum == CardName.SHA:
+            limit = self.get_sha_limit({"available_targets": available_targets})
+            # 中文注释：默认上限为 1；若已用过杀且上限<=1，则禁止继续出杀。
+            if self.sha_used_this_turn and limit <= 1:
+                return False
 
         # 闪牌判断
         elif card.name_enum == CardName.SHAN:
@@ -713,6 +738,8 @@ class Player:
         """重置回合状态"""
         self.runtime_state["play_phase_executed"] = False
         self.runtime_state["sha_used_or_played_in_play_phase"] = False
+        # 中文注释：重置本回合是否用过【杀】。
+        self.sha_used_this_turn = False
         for skill in getattr(self, "skills", []):
             # Skill 基类中提供了默认空实现，子类按需重写
             if hasattr(skill, "reset_turn_state"):

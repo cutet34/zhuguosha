@@ -4,7 +4,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 
 from backend.utils.logger import game_logger
 from backend.utils.event_sender import send_discard_card_event
-from config.enums import GameEvent
+from config.enums import GameEvent, ControlType
 
 if TYPE_CHECKING:
     from backend.player.player import Player
@@ -72,16 +72,21 @@ class ZhiHengSkill:
         if not hand_cards:
             return []
 
-        # 这里调用 Player 层的包装方法，具体实现由你在 Player 中适配到 Control
-        if hasattr(player, "select_cards_to_discard"):
-            return player.select_cards_to_discard(  # type: ignore[attr-defined]
-                max_num=len(hand_cards),
-                min_num=0,
-                reason=self.name,
-            )
+        # 与单测/历史实现保持兼容：
+        # - 人类操控：允许“弃任意张”（前端多选 + Enter/右键确认；控制台逗号输入）。
+        # - AI 操控：若没有专门策略，默认退化为“弃置全部手牌”。
+        if getattr(player.control, "control_type", None) != ControlType.HUMAN:
+            return hand_cards
 
-        # 没有封装接口时，退化为“默认弃置全部手牌”（可以视需要删掉这个 fallback）
-        return hand_cards
+        try:
+            return player.control.select_cards_to_discard_any(
+                hand_cards=hand_cards,
+                max_count=len(hand_cards),
+                min_count=0,
+                context=self.name,
+            )
+        except Exception:
+            return []
 
     def activate(self, player: "Player", context: Dict[str, Any]) -> None:
         """执行制衡效果：弃置任意张牌，然后摸等量的牌。
@@ -128,5 +133,5 @@ class ZhiHengSkill:
         Returns:
                 None: 无返回值。
         """
-        state = player.get_skill_state(self.name)
-        state["used_this_turn"] = False
+        # 与 can_activate 中的 runtime_state FLAG_KEY 保持一致
+        player.runtime_state[self.FLAG_KEY] = False

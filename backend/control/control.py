@@ -131,6 +131,47 @@ class Control:
         # 随机选择count张牌
         return random.sample(hand_cards, count)
 
+    def select_cards_to_discard_any(
+        self,
+        hand_cards: List[Card],
+        max_count: int,
+        min_count: int = 0,
+        context: str = "",
+    ) -> List[Card]:
+        """选择要弃置的若干张牌（数量可变）。
+
+        设计动机：
+        - 弃牌阶段通常是“必须弃 count 张”（固定数量）。
+        - 某些技能（如孙权【制衡】）需要“弃置任意张（0..上限）”。
+        - 为了不破坏已有接口，新增此方法。
+
+        Args:
+            hand_cards: 手牌列表。
+            max_count: 最多可弃置数量。
+            min_count: 最少必须弃置数量。
+            context: 上下文提示信息。
+
+        Returns:
+            选择的弃置牌列表（数量在 [min_count, max_count] 范围内）。
+        """
+        if not hand_cards:
+            return []
+        max_n = max(0, min(int(max_count), len(hand_cards)))
+        min_n = max(0, min(int(min_count), max_n))
+
+        # 默认策略：
+        # - 如果允许 0 张，则随机决定弃几张（更贴近“可选”语义）。
+        # - 如果必须弃至少 1 张，则弃 min_n 张。
+        if min_n == 0:
+            k = random.randint(0, max_n)
+        else:
+            k = min_n
+        if k <= 0:
+            return []
+        if k >= len(hand_cards):
+            return hand_cards.copy()
+        return random.sample(hand_cards, k)
+
     def ask_activate_skill(self, skill_name: str, context: dict) -> bool:
         """询问是否发动某个技能。skill_name如"Lvmeng_Discard_NoDrop"，context可包含player_id、hand_cards等信息。
         默认实现：始终不发动（子类/策略可重载）"""

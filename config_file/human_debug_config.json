@@ -1,0 +1,35 @@
+{
+  "deck": [
+    {"name": "SHA", "suit": "HEARTS", "rank": 1, "count": 20},
+    {"name": "SHAN", "suit": "HEARTS", "rank": 2, "count": 15},
+    {"name": "TAO", "suit": "HEARTS", "rank": 3, "count": 10},
+    {"name": "JUE_DOU", "suit": "SPADES", "rank": 1, "count": 2},
+    {"name": "NAN_MAN_RU_QIN", "suit": "SPADES", "rank": 7, "count": 2},
+    {"name": "WAN_JIAN_QI_FA", "suit": "HEARTS", "rank": 1, "count": 1},
+    {"name": "WU_XIE_KE_JI", "suit": "SPADES", "rank": 11, "count": 2},
+    {"name": "ZHU_GE_LIAN_NU", "suit": "HEARTS", "rank": 7, "count": 1}
+  ],
+  "players": [
+    {
+      "name": "主公(人类)",
+      "character_name": "BAI_BAN_WU_JIANG",
+      "identity": "LORD",
+      "control_type": "HUMAN"
+    },
+    {
+      "name": "反贼1(规则)",
+      "character_name": "BAI_BAN_WU_JIANG",
+      "identity": "REBEL",
+      "control_type": "SIMPLE_AI"
+    },
+    {
+      "name": "反贼2(自适应AI)",
+      "character_name": "BAI_BAN_WU_JIANG",
+      "identity": "REBEL",
+      "control_type": "AI"
+    }
+  ],
+  "game": {
+    "shuffle_deck": true
+  }
+}

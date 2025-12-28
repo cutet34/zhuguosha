@@ -24,6 +24,7 @@ class PlayerFactory:
         deck: Deck,
         character_name: CharacterName,
         identity: PlayerIdentity = None,
+        ai_difficulty: Optional[str] = None,
         player_controller = None
     ) -> Player:
         """创建玩家实例
@@ -32,6 +33,7 @@ class PlayerFactory:
             player_id: 玩家ID
             name: 玩家名称
             control_type: 操控类型
+            ai_difficulty: AI 难度（仅当 control_type=AI 时生效，可选：easy/medium/hard/expert）。
             deck: 牌堆
             character_name: 武将名枚举
             identity: 玩家身份
@@ -46,6 +48,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -56,6 +59,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -66,6 +70,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -76,6 +81,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -86,6 +92,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -96,6 +103,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -106,6 +114,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -116,6 +125,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,
@@ -127,6 +137,7 @@ class PlayerFactory:
                 player_id=player_id,
                 name=name,
                 control_type=control_type,
+                ai_difficulty=ai_difficulty,
                 deck=deck,
                 identity=identity,
                 character_name=character_name,

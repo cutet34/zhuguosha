@@ -4,6 +4,9 @@
 
 ## 模块间联系示意图
 
+> 备注：关于“操控模块（Control）”如何区分 **玩家控制（Human）** 与 **AI 控制（AdaptiveAI）**、以及它们与前端事件交互的细节，见：
+> `backend/control/CONTROL.md`
+
 ```mermaid
 graph TB
     %% 外部依赖

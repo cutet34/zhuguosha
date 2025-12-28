@@ -39,7 +39,9 @@ def _reward_for(player_identity: PlayerIdentity, winner_side: str) -> float:
 def _set_rl_players(config, rl_player_ids: List[int]) -> None:
     for i, p in enumerate(config.players_config):
         if i in rl_player_ids:
-            p.control_type = ControlType.RL
+            # 训练时统一使用 AI.EXPERT（内部委托 ExpertAIControl）
+            p.control_type = ControlType.AI
+            setattr(p, "ai_difficulty", "expert")
 
 
 def _collect_rl_controls(game: GameController) -> Dict[int, ExpertAIControl]:
@@ -48,8 +50,14 @@ def _collect_rl_controls(game: GameController) -> Dict[int, ExpertAIControl]:
         return {}
     out: Dict[int, ExpertAIControl] = {}
     for p in pc.players:
-        if isinstance(p.control, ExpertAIControl):
-            out[p.player_id] = p.control
+        # EXPERT 模式：Player.control 为 AdaptiveAIControl，其内部 delegate 才是 ExpertAIControl
+        ctrl = p.control
+        if isinstance(ctrl, ExpertAIControl):
+            out[p.player_id] = ctrl
+            continue
+        delegate = getattr(ctrl, "_delegate", None)
+        if isinstance(delegate, ExpertAIControl):
+            out[p.player_id] = delegate
     return out
 
 

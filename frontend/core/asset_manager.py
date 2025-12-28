@@ -1,6 +1,35 @@
 import os
 import pygame
 from config.enums import CardName, CharacterName, EffectName, PlayerIdentity
+from frontend.util.size import CARD_SIZE
+
+
+def _fit_to_box(src: pygame.Surface, box_size: tuple[int, int]) -> pygame.Surface:
+    """等比缩放并居中裁剪到固定框（cover）。
+
+    Args:
+        src: 原始图像 Surface。
+        box_size: 目标尺寸 (w, h)。
+
+    Returns:
+        适配后的 Surface（严格为 box_size）。
+    """
+    bw, bh = box_size
+    sw, sh = src.get_size()
+
+    if sw <= 0 or sh <= 0:
+        return pygame.Surface((bw, bh), pygame.SRCALPHA)
+
+    # cover：保证至少铺满框，超出部分裁掉
+    scale = max(bw / sw, bh / sh)
+    nw, nh = int(sw * scale), int(sh * scale)
+    scaled = pygame.transform.smoothscale(src, (nw, nh))
+
+    out = pygame.Surface((bw, bh), pygame.SRCALPHA)
+    x = (bw - nw) // 2
+    y = (bh - nh) // 2
+    out.blit(scaled, (x, y))
+    return out
 
 class AssetManager:
     def __init__(self, asset_root=None):
@@ -23,6 +52,8 @@ class AssetManager:
         path = os.path.join(self.card_base_path, filename)
 
         surf = pygame.image.load(path).convert_alpha()
+        surf = _fit_to_box(surf, CARD_SIZE)
+
         self._cache[key] = surf
         return surf
 
@@ -64,9 +95,10 @@ class AssetManager:
 
         if os.path.exists(path):
             surf = pygame.image.load(path).convert_alpha()
+            surf = _fit_to_box(surf, CARD_SIZE)  # 关键：统一尺寸
         else:
-            # 占位图
-            surf = pygame.Surface((100, 150))
+            # 占位图也做成统一尺寸
+            surf = pygame.Surface(CARD_SIZE, pygame.SRCALPHA)
             surf.fill((180, 180, 180))
 
         self._cache[key] = surf

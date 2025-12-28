@@ -7,6 +7,8 @@ class ZhangFeiSkill:
     name: str = "咆哮"
     is_locked: bool = True
     need_ask: bool = False
+    # 中文注释：兼容旧实现（与现有测试用例）：出【杀】后重置 sha_used_this_turn 标记。
+    reset_sha_used_flag_after_sha: bool = True
 
     def can_activate(self, player, context: Dict[str, Any]) -> bool:
         """判断技能是否需要走“显式触发”流程。

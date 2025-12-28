@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+import random
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
@@ -68,14 +69,19 @@ class QTable:
         self.table[sk][action] = float(value)
 
     def best_action(self, state: State, legal_actions: Iterable[Action]) -> Optional[Action]:
-        best_a: Optional[Action] = None
+        best_actions: List[Action] = []
         best_v = float("-inf")
         for a in legal_actions:
             v = self.get(state, a)
             if v > best_v:
                 best_v = v
-                best_a = a
-        return best_a
+                best_actions = [a]
+            elif v == best_v:
+                best_actions.append(a)
+        if not best_actions:
+            return None
+        # 同分动作随机打破平局，避免长期固定选择 PASS
+        return random.choice(best_actions)
 
     def update_episode_monte_carlo(
         self,

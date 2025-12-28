@@ -9,6 +9,19 @@ from communicator.communicator import communicator
 from communicator.comm_event import DrawCardEvent, PlayCardEvent, HPChangeEvent, DiscardCardEvent, EquipChangeEvent, DeathEvent
 from config.simple_card_config import SimpleCardConfig
 from config.enums import CardName, EquipmentType
+from communicator.communicator import communicator
+
+
+def has_communicator() -> bool:
+    """判断当前是否已配置前端通信对象。
+
+    Args:
+        None
+
+    Returns:
+        bool: 若已设置 communicator 则返回 True，否则返回 False。
+    """
+    return communicator is not None
 
 # 全局配置：是否等待ACK确认（类似环境变量）
 # 可以通过 set_wait_for_ack() 函数修改
@@ -317,4 +330,3 @@ def send_death_event(player_id: int) -> tuple:
         if _wait_for_ack:
             return False, f"Communication error: {str(e)}"
         return None, None
-
